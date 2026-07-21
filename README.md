@@ -14,7 +14,7 @@ npm install github:vanSnowi/baileys
 ```
 
 On install, a small `prepare` step compiles the protobuf schema
-(`WAProto/WAProto.proto`) into a compact lookup table (`WAProto/wa-table.json`)
+(`WAProto/WAProto.proto`) into a compact lookup table (`WAProto/WAProto.json`)
 via [`WAProto/compiler.js`](./WAProto/compiler.js). You can regenerate it any time
 after editing the `.proto`:
 

@@ -1,7 +1,5 @@
 name: Publish to GitHub Packages
 
-# Publishes the package to GitHub Packages whenever a version tag (v1.2.3) is
-# pushed. Uses the built-in GITHUB_TOKEN — no extra secret needed.
 on:
   push:
     tags:
@@ -23,9 +21,6 @@ jobs:
           registry-url: https://npm.pkg.github.com
           scope: '@vansnowi'
 
-      # protobufjs is only needed to generate WAProto/wa-table.json from the
-      # .proto — install deps (skip lifecycle scripts) then generate the table so
-      # it ships inside the published tarball.
       - name: Install deps
         run: npm install --ignore-scripts --no-audit --no-fund
 

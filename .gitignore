@@ -6,5 +6,4 @@ node_modules/
 *.tgz
 package-lock.json
 
-# generated at install/build time from WAProto.proto (see WAProto/generate.sh)
-WAProto/wa-table.json
+WAProto/WAProto.json
