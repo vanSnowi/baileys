@@ -1,0 +1,31 @@
+name: Publish to GitHub Packages
+
+# Publishes the (private) package to GitHub Packages whenever a version tag
+# (v1.2.3) is pushed. Uses the built-in GITHUB_TOKEN — no extra secret needed.
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://npm.pkg.github.com
+          scope: '@vansnowi'
+
+      # No build step: the package ships prebuilt (lib/ + WAProto/).
+      # --ignore-scripts skips the preinstall engine check on the runner.
+      - name: Publish
+        run: npm publish --ignore-scripts
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
