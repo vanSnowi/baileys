@@ -19,7 +19,7 @@ via [`WAProto/compiler.js`](./WAProto/compiler.js). You can regenerate it any ti
 after editing the `.proto`:
 
 ```bash
-bash WAProto/generate.sh      # or: node WAProto/compiler.js
+node WAProto/compiler.js
 ```
 
 ```ts
