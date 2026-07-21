@@ -1,5 +1,5 @@
 {
-  "name": "@vansnowi/tsm-baileys",
+  "name": "@vansnowi/baileys",
   "type": "module",
   "version": "1.4.5",
   "description": "Self-modified fork of Baileys (based on @whiskeysockets/baileys 7.0.0-rc13) — ships prebuilt, installable as a normal semver dependency.",

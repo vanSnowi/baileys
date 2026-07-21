@@ -15,8 +15,8 @@ npm install github:vanSnowi/baileys
 ```
 
 ```ts
-import makeWASocket from '@vansnowi/tsm-baileys'
-// or: import { makeWASocket, useMultiFileAuthState, makeInMemoryStore } from '@vansnowi/tsm-baileys'
+import makeWASocket from '@vansnowi/baileys'
+// or: import { makeWASocket, useMultiFileAuthState, makeInMemoryStore } from '@vansnowi/baileys'
 ```
 
 ## Auth state
@@ -24,7 +24,7 @@ import makeWASocket from '@vansnowi/tsm-baileys'
 Two auth-state helpers are available:
 
 ```ts
-import { useMultiFileAuthState, useSqliteAuthState } from '@vansnowi/tsm-baileys'
+import { useMultiFileAuthState, useSqliteAuthState } from '@vansnowi/baileys'
 
 // multi-file (folder of JSON files)
 const { state, saveCreds } = await useMultiFileAuthState('auth')
@@ -39,7 +39,7 @@ A classic in-memory store keeps chats, contacts, messages, group metadata and
 presences in sync by binding to the socket's event emitter:
 
 ```ts
-import makeWASocket, { makeInMemoryStore } from '@vansnowi/tsm-baileys'
+import makeWASocket, { makeInMemoryStore } from '@vansnowi/baileys'
 
 const store = makeInMemoryStore({})
 const sock = makeWASocket({ /* ... */ })
