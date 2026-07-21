@@ -4,11 +4,7 @@ node_modules/
 .env
 .npmrc
 *.tgz
-
-# WhatsApp APK dex dumps (analysis inputs, keep local only)
-extracts/*.dex
-extracts/*.db
 package-lock.json
 
-# WhatsApp Web source dump (analysis input, local only)
-extracts/wa-web/
+# generated at install/build time from WAProto.proto (see WAProto/generate.sh)
+WAProto/wa-table.json

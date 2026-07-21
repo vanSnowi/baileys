@@ -3,8 +3,7 @@
 A self-modified, prebuilt fork of [Baileys](https://github.com/WhiskeySockets/Baileys)
 (based on `@whiskeysockets/baileys` `7.0.0-rc13`).
 
-- **Ships prebuilt** — the compiled `lib/` (JS) and the generated `WAProto/`. There is
-  **no build step**, so installing never compiles anything.
+- **Prebuilt** — ships the compiled `lib/` (JS); no TypeScript compile step.
 - **API** is compatible with upstream Baileys.
 - The original upstream README is kept as [`README.upstream.md`](./README.upstream.md).
 
@@ -12,6 +11,15 @@ A self-modified, prebuilt fork of [Baileys](https://github.com/WhiskeySockets/Ba
 
 ```bash
 npm install github:vanSnowi/baileys
+```
+
+On install, a small `prepare` step compiles the protobuf schema
+(`WAProto/WAProto.proto`) into a compact lookup table (`WAProto/wa-table.json`)
+via [`WAProto/compiler.js`](./WAProto/compiler.js). You can regenerate it any time
+after editing the `.proto`:
+
+```bash
+bash WAProto/generate.sh      # or: node WAProto/compiler.js
 ```
 
 ```ts

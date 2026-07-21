@@ -1,7 +1,7 @@
 name: Publish to GitHub Packages
 
-# Publishes the (private) package to GitHub Packages whenever a version tag
-# (v1.2.3) is pushed. Uses the built-in GITHUB_TOKEN — no extra secret needed.
+# Publishes the package to GitHub Packages whenever a version tag (v1.2.3) is
+# pushed. Uses the built-in GITHUB_TOKEN — no extra secret needed.
 on:
   push:
     tags:
@@ -23,8 +23,15 @@ jobs:
           registry-url: https://npm.pkg.github.com
           scope: '@vansnowi'
 
-      # No build step: the package ships prebuilt (lib/ + WAProto/).
-      # --ignore-scripts skips the preinstall engine check on the runner.
+      # protobufjs is only needed to generate WAProto/wa-table.json from the
+      # .proto — install deps (skip lifecycle scripts) then generate the table so
+      # it ships inside the published tarball.
+      - name: Install deps
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: Generate proto table
+        run: node WAProto/compiler.js
+
       - name: Publish
         run: npm publish --ignore-scripts
         env:

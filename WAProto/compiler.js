@@ -1,3 +1,6 @@
+import { readFileSync, writeFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import Long from 'long';
 const MAXV = 0x1fffffffffffff;
 const isLongIn = v => v && typeof v === 'object' && 'low' in v && 'high' in v;
 const longToBig = v => (v.unsigned ? BigInt(v.high >>> 0) : BigInt(v.high | 0)) * 4294967296n + BigInt(v.low >>> 0);
@@ -133,7 +136,7 @@ const numOrBig = b => b <= 9007199254740991n && b >= -9007199254740991n ? Number
 const B64JSON = function () {
   return this.toString('base64');
 };
-export function makeCodec(TABLE, opts = {}) {
+function makeCodec(TABLE, opts = {}) {
   const Long = opts.Long;
   const tagBytes = opts.bytesJSON ? b => (Object.defineProperty(b, 'toJSON', {
     value: B64JSON,
@@ -325,3 +328,220 @@ export function makeCodec(TABLE, opts = {}) {
     decode
   };
 }
+const KIND = [{
+  k: 'varint',
+  s: 'int'
+}, {
+  k: 'varint',
+  s: 'zigzag'
+}, {
+  k: 'varint',
+  s: 'bool'
+}, {
+  k: 'i64',
+  s: 'long'
+}, {
+  k: 'i64',
+  s: 'double'
+}, {
+  k: 'i32',
+  s: 'int'
+}, {
+  k: 'i32',
+  s: 'float'
+}, {
+  k: 'string'
+}, {
+  k: 'bytes'
+}, {
+  k: 'varint',
+  s: 'enum'
+}, {
+  k: 'varint',
+  s: 'long'
+}, {
+  k: 'varint',
+  s: 'zigzaglong'
+}];
+function makeProto(tablePath) {
+  const {
+    m,
+    t,
+    e
+  } = JSON.parse(readFileSync(tablePath, 'utf8'));
+  const TABLE = {};
+  for (const [full, fields] of Object.entries(t)) {
+    const order = fields.map(([name, id, tc, flags = 0, enumName]) => {
+      const base = tc >= 100 ? {
+        k: 'msg',
+        msg: m[tc - 100]
+      } : KIND[tc];
+      const f = {
+        name,
+        id,
+        ...base,
+        rep: !!(flags & 1),
+        packed: !!(flags & 2)
+      };
+      if (tc === 9 && enumName && e[enumName]) f.enumMap = e[enumName];
+      return f;
+    });
+    const byId = {};
+    for (const f of order) byId[f.id] = f;
+    TABLE[full] = {
+      order,
+      byId
+    };
+  }
+  const codec = makeCodec(TABLE, {
+    Long,
+    bytesJSON: true
+  });
+  const proto = {};
+  const nodeFor = path => {
+    let c = proto;
+    for (const p of path) c = c[p] || (c[p] = {});
+    return c;
+  };
+  for (const full of Object.keys(t)) {
+    const node = nodeFor(full.replace(/^proto\./, '').split('.'));
+    node.encode = o => ({
+      finish: () => codec.encode(full, o || {})
+    });
+    node.decode = b => codec.decode(full, b);
+    node.create = o => o || {};
+    node.fromObject = o => o || {};
+    node.toObject = o => o || {};
+    node.verify = () => null;
+    node.name = full.split('.').pop();
+  }
+  for (const [full, values] of Object.entries(e)) {
+    const node = nodeFor(full.replace(/^proto\./, '').split('.'));
+    for (const [k, v] of Object.entries(values)) {
+      node[k] = v;
+      node[v] = k;
+    }
+  }
+  return {
+    proto,
+    codec
+  };
+}
+const MODS = {
+  types: {},
+  fields: {
+    'proto.SyncActionValue.AgentAction': {
+      deviceID: {
+        type: 'int32',
+        id: 2
+      }
+    },
+    'proto.SyncActionValue.ChatAssignmentAction': {
+      deviceAgentID: {
+        type: 'string',
+        id: 1
+      }
+    },
+    'proto.SyncActionValue.StatusPrivacyAction': {
+      shareToFB: {
+        type: 'bool',
+        id: 3
+      },
+      shareToIG: {
+        type: 'bool',
+        id: 4
+      }
+    }
+  }
+};
+export async function generateTable(protoPath, outPath) {
+  const pb = await import('protobufjs');
+  const protobuf = pb.default || pb;
+  const root = await protobuf.load(protoPath);
+  for (const [parent, types] of Object.entries(MODS.types || {})) {
+    const P = root.lookupType(parent);
+    for (const [name, def] of Object.entries(types)) {
+      if (P.get(name)) continue;
+      P.add(protobuf.Type.fromJSON(name, def));
+    }
+  }
+  for (const [typeName, fields] of Object.entries(MODS.fields || {})) {
+    const T = root.lookupType(typeName);
+    for (const [fname, f] of Object.entries(fields)) {
+      if (T.get(fname)) continue;
+      if (T.fieldsArray.find(x => x.id === f.id)) continue;
+      T.add(new protobuf.Field(fname, f.id, f.type, f.rule));
+    }
+  }
+  root.resolveAll();
+  const SCALAR = {
+    int32: 0,
+    uint32: 0,
+    sint32: 1,
+    bool: 2,
+    fixed64: 3,
+    sfixed64: 3,
+    double: 4,
+    fixed32: 5,
+    sfixed32: 5,
+    float: 6,
+    string: 7,
+    bytes: 8,
+    int64: 10,
+    uint64: 10,
+    sint64: 11
+  };
+  const msgNames = [];
+  const idx = n => {
+    let i = msgNames.indexOf(n);
+    return i < 0 ? msgNames.push(n) - 1 : i;
+  };
+  const t = {},
+    enums = {};
+  (function build(ns) {
+    for (const o of Object.values(ns.nested || {})) {
+      if (o.values) enums[o.fullName.replace(/^\./, '')] = o.values;
+      if (o.fieldsArray) {
+        const full = o.fullName.replace(/^\./, '');
+        const fs2 = [];
+        for (const f of o.fieldsArray) {
+          if (f.map) continue;
+          const rt = f.resolvedType;
+          let tc, enumName;
+          if (rt && rt.fieldsArray !== undefined && rt.values === undefined) tc = 100 + idx(rt.fullName.replace(/^\./, ''));else if (rt && rt.values) {
+            tc = 9;
+            enumName = rt.fullName.replace(/^\./, '');
+          } else tc = SCALAR[f.type];
+          const numeric = tc < 100 && tc !== 7 && tc !== 8;
+          const flags = (f.repeated ? 1 : 0) | (f.repeated && numeric && f.packed !== false ? 2 : 0);
+          if (tc === 9) fs2.push([f.name, f.id, 9, flags, enumName]);else if (flags) fs2.push([f.name, f.id, tc, flags]);else fs2.push([f.name, f.id, tc]);
+        }
+        fs2.sort((a, b) => a[1] - b[1]);
+        t[full] = fs2;
+      }
+      if (o.nested) build(o);
+    }
+  })(root);
+  writeFileSync(outPath, JSON.stringify({
+    m: msgNames,
+    t,
+    e: enums
+  }));
+  return {
+    types: Object.keys(t).length,
+    enums: Object.keys(enums).length
+  };
+}
+if (process.argv[1] && (process.argv[1] === fileURLToPath(import.meta.url) || process.argv.includes('--generate'))) {
+  const protoPath = fileURLToPath(new URL('./WAProto.proto', import.meta.url));
+  const outPath = fileURLToPath(new URL('./wa-table.json', import.meta.url));
+  await generateTable(protoPath, outPath);
+}
+const tablePath = fileURLToPath(new URL('./wa-table.json', import.meta.url));
+const built = makeProto(tablePath);
+export const proto = built.proto;
+export const codec = built.codec;
+export default {
+  proto,
+  codec
+};
