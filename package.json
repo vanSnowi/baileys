@@ -1,7 +1,7 @@
 {
   "name": "@vansnowi/baileys",
   "type": "module",
-  "version": "1.4.6",
+  "version": "1.4.7",
   "description": "Self-modified fork of Baileys (based on @whiskeysockets/baileys 7.0.0-rc13) — ships prebuilt, installable as a normal semver dependency.",
   "keywords": [
     "whatsapp",
