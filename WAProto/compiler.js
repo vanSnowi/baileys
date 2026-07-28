@@ -535,7 +535,10 @@ export async function generateTable(protoPath, outPath) {
 if (process.argv[1] && (process.argv[1] === fileURLToPath(import.meta.url) || process.argv.includes('--generate'))) {
   const protoPath = fileURLToPath(new URL('./WAProto.proto', import.meta.url));
   const outPath = fileURLToPath(new URL('./WAProto.json', import.meta.url));
-  await generateTable(protoPath, outPath);
+  generateTable(protoPath, outPath).catch(err => {
+    console.error(err);
+    process.exit(1);
+  });
 }
 const tablePath = fileURLToPath(new URL('./WAProto.json', import.meta.url));
 const built = makeProto(tablePath);
