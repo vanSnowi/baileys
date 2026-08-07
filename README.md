@@ -10,24 +10,59 @@ Zup, this is some weird but useful Baileys fork.
 - `richMenu` (quick reply, open URL)
 - secure code from logging via bots
 - stability & messaging fixes
+- reduced the proto from >5mb to <1mb
 
-## The funcs (short)
+## Examples
 
-**SQL auth** — `useSqliteAuthState(dir)` → stores creds/keys in SQLite via Node's built-in `node:sqlite`. No native build, runs the same on Termux / Linux / Windows / panels. Falls back to file auth on Node < 22.5.
+**participant** — send only to the target's devices, skip your own (recipient-only, no "waiting" on your side):
 
-**participant** — `relayMessage(jid, msg, { participant: { jid } })` → send only to the target's devices, skip your own (recipient-only, no "waiting" on your side).
+```js
+const message = { conversation: 'hey' }
+await sock.relayMessage(jid, message, { participant: { jid } })
+```
 
-**isSecret** — `{ isSecret: true }` → send only to the target's **main** (primary) device.
+**isSecret** — send only to the target's main (primary) device:
 
-**protected** — `{ protected: true }` → send to everything **except** the target's **linked** (secondary) devices.
+```js
+await sock.relayMessage(jid, message, { isSecret: true })
+```
 
-**participants** — `{ participants: { jid, count } }` → retry-resend to a single device.
+**protected** — send to everything except the target's linked (secondary) devices:
 
-**richMenu** — `sock.richMenu(jid, { header, body, footer, contextInfo })` → builds a GenAI rich-response menu: title/image header, buttons or a carousel of cards (quick replies), and a footer CTA (open URL).
+```js
+await sock.relayMessage(jid, message, { protected: true })
+```
 
-**secure code from logging via bots** — `isSecret` / `protected` keep a message off linked/companion devices, so a "logger" bot running on a linked device never receives it (it only lands on the phone).
+**richMenu** — quick-reply buttons (or a carousel of cards) with an image header and an open-URL footer:
 
-**stability & messaging fixes** — poll-vote decryption (LID + PN), `botInvoke` type fix, tc-token handling, WAProto made CommonJS-requireable, and `ignoreOfflineMessages` (skip history / placeholder / offline batch on reconnect).
+```js
+await sock.richMenu(jid, {
+  header: {
+    title: 'Main Menu',
+    image: { url: 'https://example.com/banner.png', inline: false }
+  },
+  body: {
+    title: 'Pick one',
+    buttons: ['Profile', 'Settings', 'Help'],
+    toast: 'opening...'
+  },
+  footer: {
+    text: 'Join us',
+    url: 't.me/example'
+  }
+})
+
+// carousel of cards instead of buttons
+await sock.richMenu(jid, {
+  body: {
+    carousel: true,
+    cards: [
+      { title: 'Card 1', buttons: ['A', 'B'], toast: '...' },
+      { title: 'Card 2', buttons: ['C', 'D'], toast: '...' }
+    ]
+  }
+})
+```
 
 ## License
 
