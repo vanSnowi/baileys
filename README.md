@@ -1,68 +1,34 @@
-# baileys
+# @vansnowi/baileys
 
-A self-modified, prebuilt fork of [Baileys](https://github.com/WhiskeySockets/Baileys)
-(based on `@whiskeysockets/baileys` `7.0.0-rc13`).
+Zup, this is some weird but useful Baileys fork.
 
-- **Prebuilt** — ships the compiled `lib/` (JS); no TypeScript compile step.
-- **API** is compatible with upstream Baileys.
-- The original upstream README is kept as [`README.upstream.md`](./README.upstream.md).
+## Features
 
-## Install
+- rc14 based
+- SQL auth
+- `participant` support
+- `richMenu` (quick reply, open URL)
+- secure code from logging via bots
+- stability & messaging fixes
 
-```bash
-npm install github:vanSnowi/baileys
-```
+## The funcs (short)
 
-On install, a small `prepare` step compiles the protobuf schema
-(`WAProto/WAProto.proto`) into a compact lookup table (`WAProto/WAProto.json`)
-via [`WAProto/compiler.js`](./WAProto/compiler.js). You can regenerate it any time
-after editing the `.proto`:
+**SQL auth** — `useSqliteAuthState(dir)` → stores creds/keys in SQLite via Node's built-in `node:sqlite`. No native build, runs the same on Termux / Linux / Windows / panels. Falls back to file auth on Node < 22.5.
 
-```bash
-node WAProto/compiler.js
-```
+**participant** — `relayMessage(jid, msg, { participant: { jid } })` → send only to the target's devices, skip your own (recipient-only, no "waiting" on your side).
 
-```ts
-import makeWASocket from '@vansnowi/baileys'
-// or: import { makeWASocket, useMultiFileAuthState, makeInMemoryStore } from '@vansnowi/baileys'
-```
+**isSecret** — `{ isSecret: true }` → send only to the target's **main** (primary) device.
 
-## Auth state
+**protected** — `{ protected: true }` → send to everything **except** the target's **linked** (secondary) devices.
 
-Two auth-state helpers are available:
+**participants** — `{ participants: { jid, count } }` → retry-resend to a single device.
 
-```ts
-import { useMultiFileAuthState, useSqliteAuthState } from '@vansnowi/baileys'
+**richMenu** — `sock.richMenu(jid, { header, body, footer, contextInfo })` → builds a GenAI rich-response menu: title/image header, buttons or a carousel of cards (quick replies), and a footer CTA (open URL).
 
-// multi-file (folder of JSON files)
-const { state, saveCreds } = await useMultiFileAuthState('auth')
+**secure code from logging via bots** — `isSecret` / `protected` keep a message off linked/companion devices, so a "logger" bot running on a linked device never receives it (it only lands on the phone).
 
-// single-file SQLite (crash-safe, WAL, atomic writes) — needs `better-sqlite3`
-const { state, saveCreds } = await useSqliteAuthState('auth.db')
-```
-
-## In-memory store
-
-A classic in-memory store keeps chats, contacts, messages, group metadata and
-presences in sync by binding to the socket's event emitter:
-
-```ts
-import makeWASocket, { makeInMemoryStore } from '@vansnowi/baileys'
-
-const store = makeInMemoryStore({})
-const sock = makeWASocket({ /* ... */ })
-store.bind(sock.ev)
-
-// read back
-store.loadMessage(jid, id)         // a single message
-store.chats.all()                  // all chats
-store.contacts                     // contact map
-
-// persist / restore
-store.writeToFile('./store.json')
-store.readFromFile('./store.json')
-```
+**stability & messaging fixes** — poll-vote decryption (LID + PN), `botInvoke` type fix, tc-token handling, WAProto made CommonJS-requireable, and `ignoreOfflineMessages` (skip history / placeholder / offline batch on reconnect).
 
 ## License
 
-MIT — see [`LICENSE`](./LICENSE). Based on Baileys by the WhiskeySockets project.
+MIT — see [`LICENSE`](./LICENSE). Based on [Baileys](https://github.com/WhiskeySockets/Baileys) by the WhiskeySockets project.
