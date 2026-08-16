@@ -532,16 +532,17 @@ export async function generateTable(protoPath, outPath) {
     enums: Object.keys(enums).length
   };
 }
-if (process.argv[1] && (process.argv[1] === fileURLToPath(import.meta.url) || process.argv.includes('--generate'))) {
+const isGeneratorRun = process.argv[1] && (process.argv[1] === fileURLToPath(import.meta.url) || process.argv.includes('--generate'));
+if (isGeneratorRun) {
   const protoPath = fileURLToPath(new URL('./WAProto.proto', import.meta.url));
   const outPath = fileURLToPath(new URL('./WAProto.json', import.meta.url));
-  generateTable(protoPath, outPath).catch(err => {
+  generateTable(protoPath, outPath).then(() => process.exit(0)).catch(err => {
     console.error(err);
     process.exit(1);
   });
 }
 const tablePath = fileURLToPath(new URL('./WAProto.json', import.meta.url));
-const built = makeProto(tablePath);
+const built = isGeneratorRun ? {} : makeProto(tablePath);
 export const proto = built.proto;
 export const codec = built.codec;
 export default {
