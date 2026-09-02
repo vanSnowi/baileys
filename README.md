@@ -8,6 +8,7 @@ Zup, this is some weird but useful Baileys fork.
 - SQL auth
 - `participant` support
 - `richMenu` (quick reply, open URL)
+- `sendHtml` (render raw HTML)
 - secure code from logging via bots
 - stability & messaging fixes
 - reduced the proto from >5mb to <1mb
@@ -62,6 +63,12 @@ await sock.richMenu(jid, {
     ]
   }
 })
+```
+
+**sendHtml** — render a raw HTML payload:
+
+```js
+await sock.sendHtml(jid, `<h1>Hello</h1><p>rendered from HTML</p>`)
 ```
 
 ## License
