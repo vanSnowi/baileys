@@ -26,7 +26,8 @@
   ],
   "scripts": {
     "preinstall": "node ./engine-requirements.js",
-    "prepare": "node WAProto/compiler.js"
+    "prepare": "node WAProto/compiler.js",
+    "test": "node --test"
   },
   "dependencies": {
     "@cacheable/node-cache": "^1.4.0",
