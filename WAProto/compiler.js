@@ -4,7 +4,7 @@ import Long from 'long';
 const MAXV = 0x1fffffffffffff;
 const isLongIn = v => v && typeof v === 'object' && 'low' in v && 'high' in v;
 const longToBig = v => (v.unsigned ? BigInt(v.high >>> 0) : BigInt(v.high | 0)) * 4294967296n + BigInt(v.low >>> 0);
-const toBig = v => typeof v === 'bigint' ? v : isLongIn(v) ? longToBig(v) : BigInt(Math.trunc(Number(v)));
+const toBig = v => typeof v === 'bigint' ? v : isLongIn(v) ? longToBig(v) : typeof v === 'string' && /^[+-]?\d+$/.test(v.trim()) ? BigInt(v.trim()) : BigInt(Math.trunc(Number(v)));
 class Writer {
   constructor() {
     this.buf = new Uint8Array(128);
@@ -171,6 +171,7 @@ function makeCodec(TABLE, opts = {}) {
         }
       case 'msg':
         {
+          if (v === null || typeof v !== 'object') throw new Error(`expected message object for ${f.msg}, got ${typeof v}`);
           const s = new Writer();
           encodeInto(s, TABLE[f.msg], v);
           const b = s.finish();
@@ -201,8 +202,36 @@ function makeCodec(TABLE, opts = {}) {
           if (v === undefined) continue;
         }
       }
+      if (f.map) {
+        const keyField = {
+          k: f.key.k,
+          s: f.key.s
+        };
+        const keyIsNumeric = f.key.k !== 'string';
+        for (const kk of Object.keys(v)) {
+          const vv = v[kk];
+          const s = new Writer();
+          s.tag(1, wireOf(keyField));
+          writeScalar(s, keyField, keyIsNumeric ? Number(kk) : kk);
+          if (vv != null) {
+            s.tag(2, wireOf(f));
+            writeScalar(s, f, vv);
+          }
+          const b = s.finish();
+          w.tag(f.id, 2);
+          w.varintNum(b.length);
+          w.raw(b);
+        }
+        continue;
+      }
       if (f.rep) {
-        if (!Array.isArray(v)) v = [v];
+        if (!Array.isArray(v)) {
+          if (f.k === 'msg' && (v === null || typeof v !== 'object')) {
+            throw new Error(`${T.name}.${f.name}: repeated message field expects an array of ${f.msg}, got ${typeof v}`);
+          }
+          v = [v];
+        }
+        if (!v.length) continue;
         if (f.packed && (f.k === 'varint' || f.k === 'i64' || f.k === 'i32')) {
           const s = new Writer();
           for (let j = 0; j < v.length; j++) writeScalar(s, f, v[j]);
@@ -305,6 +334,24 @@ function makeCodec(TABLE, opts = {}) {
         skip(r, wire);
         continue;
       }
+      if (f.map && wire === 2) {
+        const len = r.varint();
+        const end = r.p + len;
+        const keyField = {
+          k: f.key.k,
+          s: f.key.s
+        };
+        let key, val;
+        while (r.p < end) {
+          const t2 = r.varint();
+          const id2 = t2 >>> 3;
+          const w2 = t2 & 7;
+          if (id2 === 1) key = readScalar(r, keyField);else if (id2 === 2) val = readScalar(r, f);else skip(r, w2);
+        }
+        const mapObj = obj[f.name] || (obj[f.name] = {});
+        mapObj[key] = val;
+        continue;
+      }
       if (f.rep && wire === 2 && (f.k === 'varint' || f.k === 'i64' || f.k === 'i32')) {
         const len = r.varint();
         const end = r.p + len;
@@ -371,7 +418,7 @@ function makeProto(tablePath) {
   } = JSON.parse(readFileSync(tablePath, 'utf8'));
   const TABLE = {};
   for (const [full, fields] of Object.entries(t)) {
-    const order = fields.map(([name, id, tc, flags = 0, enumName]) => {
+    const order = fields.map(([name, id, tc, flags = 0, enumName, keyTc]) => {
       const base = tc >= 100 ? {
         k: 'msg',
         msg: m[tc - 100]
@@ -384,13 +431,18 @@ function makeProto(tablePath) {
         packed: !!(flags & 2)
       };
       if (tc === 9 && enumName && e[enumName]) f.enumMap = e[enumName];
+      if (flags & 4) {
+        f.map = true;
+        f.key = KIND[keyTc];
+      }
       return f;
     });
     const byId = {};
     for (const f of order) byId[f.id] = f;
     TABLE[full] = {
       order,
-      byId
+      byId,
+      name: full
     };
   }
   const codec = makeCodec(TABLE, {
@@ -505,7 +557,16 @@ export async function generateTable(protoPath, outPath) {
         const full = o.fullName.replace(/^\./, '');
         const fs2 = [];
         for (const f of o.fieldsArray) {
-          if (f.map) continue;
+          if (f.map) {
+            const rt = f.resolvedType;
+            let vtc, enumName;
+            if (rt && rt.fieldsArray !== undefined && rt.values === undefined) vtc = 100 + idx(rt.fullName.replace(/^\./, ''));else if (rt && rt.values) {
+              vtc = 9;
+              enumName = rt.fullName.replace(/^\./, '');
+            } else vtc = SCALAR[f.type];
+            fs2.push([f.name, f.id, vtc, 4, enumName ?? null, SCALAR[f.keyType]]);
+            continue;
+          }
           const rt = f.resolvedType;
           let tc, enumName;
           if (rt && rt.fieldsArray !== undefined && rt.values === undefined) tc = 100 + idx(rt.fullName.replace(/^\./, ''));else if (rt && rt.values) {
