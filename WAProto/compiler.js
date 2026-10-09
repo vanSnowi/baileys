@@ -2,8 +2,6 @@ import { readFileSync, writeFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import Long from 'long';
 const MAXV = 0x1fffffffffffff;
-const MAX_REPEATED = 100000;
-const MAX_DEPTH = 100;
 const isLongIn = v => v && typeof v === 'object' && 'low' in v && 'high' in v;
 const longToBig = v => (v.unsigned ? BigInt(v.high >>> 0) : BigInt(v.high | 0)) * 4294967296n + BigInt(v.low >>> 0);
 const toBig = v => typeof v === 'bigint' ? v : isLongIn(v) ? longToBig(v) : typeof v === 'string' && /^[+-]?\d+$/.test(v.trim()) ? BigInt(v.trim()) : BigInt(Math.trunc(Number(v)));
@@ -173,7 +171,6 @@ function makeCodec(TABLE, opts = {}) {
         }
       case 'msg':
         {
-          if (v === null || typeof v !== 'object') throw new Error(`expected message object for ${f.msg}, got ${typeof v}`);
           const s = new Writer();
           encodeInto(s, TABLE[f.msg], v);
           const b = s.finish();
@@ -197,7 +194,12 @@ function makeCodec(TABLE, opts = {}) {
           return Number.isFinite(n) ? n : undefined;
         };
         if (f.rep) {
-          v = (Array.isArray(v) ? v : [v]).map(re).filter(x => x !== undefined);
+          const values = [];
+          for (let j = 0; j < v.length; j++) {
+            const value = re(v[j]);
+            if (value !== undefined) values.push(value);
+          }
+          v = values;
           if (!v.length) continue;
         } else {
           v = re(v);
@@ -227,12 +229,6 @@ function makeCodec(TABLE, opts = {}) {
         continue;
       }
       if (f.rep) {
-        if (!Array.isArray(v)) {
-          if (f.k === 'msg' && (v === null || typeof v !== 'object')) {
-            throw new Error(`${T.name}.${f.name}: repeated message field expects an array of ${f.msg}, got ${typeof v}`);
-          }
-          v = [v];
-        }
         if (!v.length) continue;
         if (f.packed && (f.k === 'varint' || f.k === 'i64' || f.k === 'i32')) {
           const s = new Writer();
@@ -259,7 +255,7 @@ function makeCodec(TABLE, opts = {}) {
     encodeInto(w, TABLE[msgName], obj);
     return w.finish();
   }
-  function readScalar(r, f, depth) {
+  function readScalar(r, f) {
     switch (f.k) {
       case 'varint':
         {
@@ -317,20 +313,15 @@ function makeCodec(TABLE, opts = {}) {
           const len = r.varint();
           const sub = r.buf.subarray(r.p, r.p + len);
           r.p += len;
-          return decode(f.msg, sub, depth + 1);
+          return decode(f.msg, sub);
         }
     }
   }
-  function decode(msgName, buf, depth = 0) {
-    if (depth > MAX_DEPTH) throw new Error('waproto: message nesting too deep');
+  function decode(msgName, buf) {
     const T = TABLE[msgName];
     if (!T) throw new Error('unknown message: ' + msgName);
     const byId = T.byId;
     const obj = {};
-    const counts = {};
-    const bump = f => {
-      if ((counts[f.id] = (counts[f.id] || 0) + 1) > MAX_REPEATED) throw new Error(`waproto: too many values for ${T.name}.${f.name}`);
-    };
     const r = new Reader(buf);
     while (r.p < r.len) {
       const tag = r.varint();
@@ -342,7 +333,6 @@ function makeCodec(TABLE, opts = {}) {
         continue;
       }
       if (f.map && wire === 2) {
-        bump(f);
         const len = r.varint();
         const end = r.p + len;
         const keyField = {
@@ -354,7 +344,7 @@ function makeCodec(TABLE, opts = {}) {
           const t2 = r.varint();
           const id2 = t2 >>> 3;
           const w2 = t2 & 7;
-          if (id2 === 1) key = readScalar(r, keyField, depth);else if (id2 === 2) val = readScalar(r, f, depth);else skip(r, w2);
+          if (id2 === 1) key = readScalar(r, keyField);else if (id2 === 2) val = readScalar(r, f);else skip(r, w2);
         }
         const mapObj = obj[f.name] || (obj[f.name] = {});
         mapObj[key] = val;
@@ -365,13 +355,11 @@ function makeCodec(TABLE, opts = {}) {
         const end = r.p + len;
         const arr = obj[f.name] || (obj[f.name] = []);
         while (r.p < end) {
-          bump(f);
-          arr.push(readScalar(r, f, depth));
+          arr.push(readScalar(r, f));
         }
       } else {
-        const val = readScalar(r, f, depth);
+        const val = readScalar(r, f);
         if (f.rep) {
-          bump(f);
           (obj[f.name] || (obj[f.name] = [])).push(val);
         } else obj[f.name] = val;
       }
