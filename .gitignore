@@ -6,4 +6,3 @@ node_modules/
 *.tgz
 package-lock.json
 
-WAProto/WAProto.json

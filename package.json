@@ -1,7 +1,7 @@
 {
   "name": "@vansnowi/baileys",
   "type": "module",
-  "version": "1.9.0",
+  "version": "1.10.0",
   "description": "Self-modified fork of Baileys (based on @whiskeysockets/baileys 7.0.0-rc13) — ships prebuilt, installable as a normal semver dependency.",
   "keywords": [
     "whatsapp",
@@ -26,7 +26,7 @@
   ],
   "scripts": {
     "preinstall": "node ./engine-requirements.js",
-    "prepare": "node WAProto/compiler.js",
+    "WAProto": "node WAProto/generate.mjs",
     "test": "node --test"
   },
   "dependencies": {
@@ -70,5 +70,8 @@
   },
   "engines": {
     "node": ">=20.0.0"
+  },
+  "devDependencies": {
+    "protobufjs-cli": "^1.1.3"
   }
 }

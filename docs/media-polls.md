@@ -10,7 +10,7 @@ Use the socket helper so media upload, association, hashing, order, stanza metad
 emission stay together:
 
 ```js
-const result = await sock.sendPollWithImages(from, {
+const result = await sock.pollImage(from, {
     name: 'Which image do you prefer?',
     selectableCount: 1,
     options: [
